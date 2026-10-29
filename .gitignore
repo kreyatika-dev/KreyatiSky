@@ -1,0 +1,22 @@
+# Réglages locaux : peuvent contenir la clé API Anthropic et les mots de passe
+# des caméras RTSP. Recréé automatiquement avec les valeurs par défaut.
+config.json
+
+# Vidéos importées (personnelles, volumineuses). Le dossier est recréé au démarrage.
+uploads/
+
+# Modèles YOLO : téléchargés automatiquement au premier lancement.
+# Un moteur TensorRT (.engine) n'est valable que sur le Jetson qui l'a compilé.
+*.pt
+*.engine
+*.onnx
+
+# Environnement Python et caches
+.venv/
+__pycache__/
+*.pyc
+.cache/
+runs/
+
+# Système
+.DS_Store

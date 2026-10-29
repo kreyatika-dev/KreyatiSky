@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="fr" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KreyatiSky TrafficVision - Comptage Intelligent de Véhicules</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0f9ff',
+                            400: '#38bdf8',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            900: '#0c4a6e',
+                        },
+                        upgreen: '#10b981',
+                        downorange: '#f97316',
+                        darkbg: '#0f172a',
+                        darkcard: '#1e293b',
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans antialiased selection:bg-sky-500 selection:text-white">
+
+    <!-- Header Navigation -->
+    <header class="bg-slate-900/80 backdrop-blur-md border-b border-slate-800 sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-sky-500 to-emerald-400 flex items-center justify-center shadow-lg shadow-sky-500/20 ring-1 ring-white/20">
+                    <i data-lucide="scan-line" class="w-5 h-5 text-white"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold tracking-tight bg-gradient-to-r from-sky-400 via-teal-300 to-emerald-400 bg-clip-text text-transparent">
+                        KreyatiSky <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-sky-950 text-sky-400 border border-sky-800 ml-1">TrafficVision</span>
+                    </h1>
+                    <p class="text-xs text-slate-400">Comptage Directionnel & IA YOLO</p>
+                </div>
+            </div>
+
+            <div class="flex items-center space-x-3">
+                <!-- Status Badge -->
+                <div id="statusBadge" class="flex items-center space-x-2 px-3 py-1.5 rounded-full bg-emerald-950/60 border border-emerald-800/60 text-emerald-400 text-xs font-medium">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span id="sourceStatusText">Direct Actif</span>
+                </div>
+
+                <!-- Action Buttons -->
+                <button id="btnSnapshot" title="Prendre un instantané" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition flex items-center">
+                    <i data-lucide="camera" class="w-4 h-4"></i>
+                </button>
+                <button id="btnExportCsv" title="Exporter rapport CSV" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition flex items-center">
+                    <i data-lucide="file-down" class="w-4 h-4"></i>
+                </button>
+                <button id="btnReset" title="Réinitialiser les compteurs" class="p-2 rounded-lg bg-rose-950/50 hover:bg-rose-900/60 text-rose-300 border border-rose-800/60 transition flex items-center">
+                    <i data-lucide="rotate-ccw" class="w-4 h-4 mr-1"></i>
+                    <span class="text-xs font-medium hidden sm:inline">Reset</span>
+                </button>
+                <button id="btnSettings" title="Paramètres" class="p-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white shadow-lg shadow-sky-600/30 transition flex items-center space-x-1.5">
+                    <i data-lucide="sliders-horizontal" class="w-4 h-4"></i>
+                    <span class="text-xs font-medium hidden sm:inline">Paramètres</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Layout -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+        <!-- KPI Metrics Grid -->
+        <section class="grid grid-cols-2 xl:grid-cols-5 gap-4">
+            <!-- UP Card (Monte) -->
+            <div class="glass-card p-4 rounded-2xl relative overflow-hidden group hover:border-emerald-500/50 transition">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-semibold uppercase tracking-wider text-emerald-400 flex items-center">
+                        <i data-lucide="arrow-up-circle" class="w-4 h-4 mr-1 text-emerald-400 animate-bounce"></i>
+                        Monte (Nord / In)
+                    </span>
+                    <span id="pctUp" class="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800">0%</span>
+                </div>
+                <div class="flex items-baseline justify-between">
+                    <div id="statCountUp" class="text-3xl sm:text-4xl font-extrabold text-emerald-400 tracking-tight">0</div>
+                    <div class="text-xs text-slate-400">véhicules</div>
+                </div>
+                <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-400"></div>
+            </div>
+
+            <!-- DOWN Card (Descend) -->
+            <div class="glass-card p-4 rounded-2xl relative overflow-hidden group hover:border-orange-500/50 transition">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-semibold uppercase tracking-wider text-orange-400 flex items-center">
+                        <i data-lucide="arrow-down-circle" class="w-4 h-4 mr-1 text-orange-400 animate-bounce"></i>
+                        Descend (Sud / Out)
+                    </span>
+                    <span id="pctDown" class="text-xs font-bold px-2 py-0.5 rounded-full bg-orange-950 text-orange-300 border border-orange-800">0%</span>
+                </div>
+                <div class="flex items-baseline justify-between">
+                    <div id="statCountDown" class="text-3xl sm:text-4xl font-extrabold text-orange-400 tracking-tight">0</div>
+                    <div class="text-xs text-slate-400">véhicules</div>
+                </div>
+                <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-orange-500 to-amber-400"></div>
+            </div>
+
+            <!-- TOTAL Card -->
+            <div class="glass-card p-4 rounded-2xl relative overflow-hidden group hover:border-sky-500/50 transition">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-semibold uppercase tracking-wider text-sky-400 flex items-center">
+                        <i data-lucide="car" class="w-4 h-4 mr-1 text-sky-400"></i>
+                        Total détecté
+                    </span>
+                    <span class="text-xs font-bold px-2 py-0.5 rounded-full bg-sky-950 text-sky-300 border border-sky-800">Global</span>
+                </div>
+                <div class="flex items-baseline justify-between">
+                    <div id="statCountTotal" class="text-3xl sm:text-4xl font-extrabold text-sky-400 tracking-tight">0</div>
+                    <div class="text-[11px] text-slate-400 text-right leading-4">
+                        <div><span id="statAwaitingCrossing">0</span> avant ligne</div>
+                        <div><span id="statAwaitingDirection">0</span> sens incertain</div>
+                        <div><span id="statDirectionKnown">0</span> sens connus</div>
+                    </div>
+                </div>
+                <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-sky-500 to-indigo-500"></div>
+            </div>
+
+            <!-- FLOW RATE & FPS Card -->
+            <div class="glass-card p-4 rounded-2xl relative overflow-hidden group hover:border-purple-500/50 transition">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-semibold uppercase tracking-wider text-purple-400 flex items-center">
+                        <i data-lucide="gauge" class="w-4 h-4 mr-1 text-purple-400"></i>
+                        Débit & Fluidité
+                    </span>
+                    <span id="statFps" class="text-xs font-bold px-2 py-0.5 rounded-full bg-purple-950 text-purple-300 border border-purple-800">AUTO · 0.0 FPS</span>
+                </div>
+                <div class="flex items-baseline justify-between">
+                    <div id="statFlowRate" class="text-3xl sm:text-4xl font-extrabold text-purple-400 tracking-tight">0.0</div>
+                    <div class="text-xs text-slate-400">véh./minute</div>
+                </div>
+                <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-500 to-pink-500"></div>
+            </div>
+
+            <!-- SPEED Card -->
+            <div class="glass-card p-4 rounded-2xl relative overflow-hidden group hover:border-cyan-500/50 transition">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-semibold uppercase tracking-wider text-cyan-400 flex items-center"><i data-lucide="gauge-circle" class="w-4 h-4 mr-1"></i>Vitesses</span>
+                    <span id="statSpeedCount" class="text-xs font-bold px-2 py-0.5 rounded-full bg-cyan-950 text-cyan-300 border border-cyan-800">0 mesurée</span>
+                </div>
+                <div class="flex items-baseline justify-between">
+                    <div id="statMaxSpeed" class="text-3xl sm:text-4xl font-extrabold text-cyan-400 tracking-tight">—</div>
+                    <div class="text-xs text-slate-400">km/h max</div>
+                </div>
+                <div class="text-[11px] text-slate-400 mt-1">Moyenne : <span id="statAvgSpeed" class="font-bold text-cyan-200">— km/h</span></div>
+                <div id="statSpeedStatus" class="text-[10px] text-slate-500 mt-0.5">En attente d’un véhicule dans la zone</div>
+                <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-cyan-500 to-blue-500"></div>
+            </div>
+        </section>
+
+        <!-- Main Video & Activity Section -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+            <!-- Video Player Column (2/3 width on desktop) -->
+            <div class="lg:col-span-2 space-y-4">
+                <div class="glass-card rounded-2xl p-3 relative overflow-hidden flex flex-col">
+                    <div class="flex items-center justify-between pb-3 px-2 border-b border-slate-800/80">
+                        <div class="flex items-center space-x-2">
+                            <span class="relative flex h-3 w-3">
+                                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                                <span class="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                            </span>
+                            <span class="text-sm font-semibold text-slate-200">Flux Vidéo en Direct</span>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <button id="btnToggleBoxes" class="px-2.5 py-1 text-xs rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700">Boîtes</button>
+                            <button id="btnToggleTrails" class="px-2.5 py-1 text-xs rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700">Trajectoires</button>
+                            <button id="btnToggleLines" class="px-2.5 py-1 text-xs rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700" title="Masque les lignes à l'écran ; le comptage et la vitesse continuent de les utiliser">Lignes</button>
+                            <button id="btnFullscreen" class="p-1 text-slate-400 hover:text-white" title="Plein écran">
+                                <i data-lucide="maximize" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Video Container -->
+                    <div id="videoContainer" class="relative mt-3 rounded-xl overflow-hidden bg-black aspect-video flex items-center justify-center border border-slate-800 shadow-inner group">
+                        <img id="videoFeed" src="/video_feed" alt="Flux Vidéo YOLO" class="w-full h-full object-contain select-none">
+                        
+                        <!-- Overlay Loading Spinner if stream drops -->
+                        <div id="videoLoader" class="hidden absolute inset-0 bg-slate-950/80 flex-col items-center justify-center space-y-3">
+                            <div class="w-10 h-10 border-4 border-sky-500 border-t-transparent rounded-full animate-spin"></div>
+                            <p class="text-sm text-slate-300">Connexion au flux vidéo...</p>
+                        </div>
+                    </div>
+
+                    <!-- Interactive Quick Line Adjuster Slider -->
+                    <div class="mt-3 p-3 bg-slate-900/60 rounded-xl border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3">
+                        <div class="flex items-center space-x-2 text-xs text-slate-400">
+                            <i data-lucide="move-vertical" class="w-4 h-4 text-sky-400"></i>
+                            <span>Hauteur de la ligne de comptage :</span>
+                            <span id="lblLineY" class="font-bold text-sky-400">55%</span>
+                        </div>
+                        <div class="w-full sm:w-1/2 flex items-center space-x-3">
+                            <input id="quickSliderLineY" type="range" min="10" max="90" value="55" class="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-sky-500">
+                        </div>
+                    </div>
+
+                    <!-- Video File Playback & Progress Controls (Affiché pour les fichiers vidéo) -->
+                    <div id="videoFileControls" class="mt-3 p-3 bg-slate-900/90 rounded-xl border border-sky-800/60 flex flex-col space-y-2 hidden">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-2">
+                                <button id="btnVideoPlayPause" class="p-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-medium text-xs transition flex items-center">
+                                    <i data-lucide="pause" id="iconPlayPause" class="w-4 h-4"></i>
+                                </button>
+                                <button id="btnVideoReplay" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs transition flex items-center space-x-1" title="Rejouer depuis le début">
+                                    <i data-lucide="rotate-ccw" class="w-4 h-4 text-sky-400"></i>
+                                    <span class="hidden sm:inline">Recommencer</span>
+                                </button>
+                                <span id="txtVideoStatus" class="text-xs font-semibold text-emerald-400">Lecture en cours...</span>
+                            </div>
+                            <div class="text-xs font-mono text-slate-300">
+                                <span id="lblVideoCurrentTime">00:00</span> / <span id="lblVideoTotalTime">00:00</span>
+                                <span id="lblVideoPercent" class="ml-1 text-sky-400 font-bold">(0%)</span>
+                            </div>
+                        </div>
+                        <!-- Progress Bar -->
+                        <div class="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden">
+                            <div id="barVideoProgress" class="bg-gradient-to-r from-sky-500 to-emerald-400 h-full rounded-full transition-all duration-300" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+
+            <!-- Right Column: Vehicle Breakdown & Live Events Feed -->
+            <div class="space-y-6">
+
+                <!-- Vehicle Classes Breakdown -->
+                <div class="glass-card rounded-2xl p-4">
+                    <h3 class="text-sm font-semibold text-slate-200 mb-3 flex items-center">
+                        <i data-lucide="pie-chart" class="w-4 h-4 mr-2 text-sky-400"></i>
+                        Répartition par Véhicule
+                    </h3>
+                    <div class="space-y-3">
+                        <!-- Voitures -->
+                        <div>
+                            <div class="flex justify-between text-xs mb-1">
+                                <span class="text-slate-300 font-medium flex items-center">
+                                    <i data-lucide="car" class="w-3.5 h-3.5 mr-1 text-sky-400"></i> Voitures
+                                </span>
+                                <span id="cntClassCar" class="font-bold text-slate-200">0 (▲0 | ▼0)</span>
+                            </div>
+                            <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                                <div id="barClassCar" class="bg-sky-500 h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+                            </div>
+                        </div>
+
+                        <!-- Camions -->
+                        <div>
+                            <div class="flex justify-between text-xs mb-1">
+                                <span class="text-slate-300 font-medium flex items-center">
+                                    <i data-lucide="truck" class="w-3.5 h-3.5 mr-1 text-orange-400"></i> Camions
+                                </span>
+                                <span id="cntClassTruck" class="font-bold text-slate-200">0 (▲0 | ▼0)</span>
+                            </div>
+                            <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                                <div id="barClassTruck" class="bg-orange-500 h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+                            </div>
+                        </div>
+
+                        <!-- Motos -->
+                        <div>
+                            <div class="flex justify-between text-xs mb-1">
+                                <span class="text-slate-300 font-medium flex items-center">
+                                    <i data-lucide="bike" class="w-3.5 h-3.5 mr-1 text-emerald-400"></i> Motos
+                                </span>
+                                <span id="cntClassMotorcycle" class="font-bold text-slate-200">0 (▲0 | ▼0)</span>
+                            </div>
+                            <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                                <div id="barClassMotorcycle" class="bg-emerald-500 h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+                            </div>
+                        </div>
+
+                        <!-- Bus -->
+                        <div>
+                            <div class="flex justify-between text-xs mb-1">
+                                <span class="text-slate-300 font-medium flex items-center">
+                                    <i data-lucide="bus" class="w-3.5 h-3.5 mr-1 text-purple-400"></i> Bus
+                                </span>
+                                <span id="cntClassBus" class="font-bold text-slate-200">0 (▲0 | ▼0)</span>
+                            </div>
+                            <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                                <div id="barClassBus" class="bg-purple-500 h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Live Crossing Events Activity Log -->
+                <div class="glass-card rounded-2xl p-4 flex flex-col h-[320px]">
+                    <div class="flex items-center justify-between pb-2 mb-2 border-b border-slate-800">
+                        <h3 class="text-sm font-semibold text-slate-200 flex items-center">
+                            <i data-lucide="history" class="w-4 h-4 mr-2 text-emerald-400"></i>
+                            Journal des Passages
+                        </h3>
+                        <span class="text-[10px] text-slate-500 uppercase tracking-wider font-mono">Temps Réel</span>
+                    </div>
+                    <div id="eventsList" class="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                        <div class="text-center py-10 text-xs text-slate-500">
+                            En attente de détection de véhicules...
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </main>
+
+    <!-- Settings Slide-over Modal / Drawer -->
+    <div id="settingsDrawer" class="fixed inset-0 z-50 overflow-hidden hidden">
+        <div id="settingsBackdrop" class="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity"></div>
+        <div class="fixed inset-y-0 right-0 max-w-full flex pl-10">
+            <div class="w-screen max-w-md bg-slate-900 border-l border-slate-800 p-6 flex flex-col space-y-6 shadow-2xl overflow-y-auto custom-scrollbar">
+                
+                <div class="flex items-center justify-between pb-4 border-b border-slate-800">
+                    <div class="flex items-center space-x-2">
+                        <i data-lucide="settings" class="w-5 h-5 text-sky-400"></i>
+                        <h2 class="text-lg font-bold text-white">Paramètres du Système</h2>
+                    </div>
+                    <button id="btnCloseSettings" class="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800">
+                        <i data-lucide="x" class="w-5 h-5"></i>
+                    </button>
+                </div>
+
+                <!-- Source Selection Form -->
+                <div class="space-y-3 bg-slate-950/50 p-4 rounded-xl border border-slate-800">
+                    <label class="text-xs font-bold text-sky-400 uppercase tracking-wider block">1. Source Vidéo</label>
+                    <select id="selSourceType" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:ring-2 focus:ring-sky-500 outline-none">
+                        <option value="demo">🎮 Simulateur de trafic (Démo intégrée)</option>
+                        <option value="webcam">📹 Webcam de l'ordinateur (USB / Cam intégrée)</option>
+                        <option value="csi">🎥 Caméra CSI du Jetson (nappe)</option>
+                        <option value="rtsp">🌐 Caméra IP / Flux Réseau (RTSP / HTTP)</option>
+                        <option value="file">📁 Fichier Vidéo Local</option>
+                    </select>
+
+                    <div id="grpSourcePath" class="space-y-1">
+                        <label class="text-xs text-slate-400">Chemin / Index / URL de la source :</label>
+                        <input id="txtSourcePath" type="text" placeholder="0 (Webcam) ou rtsp://... ou /chemin/video.mp4" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200 focus:ring-2 focus:ring-sky-500 outline-none font-mono">
+                    </div>
+
+                    <!-- File Upload & Selection (Shown when 'file' is selected) -->
+                    <div id="grpFileUpload" class="space-y-3 hidden">
+                        <div id="grpExistingVideos" class="space-y-1 hidden">
+                            <label class="text-xs text-slate-300 font-semibold">Vidéos disponibles sur le serveur :</label>
+                            <select id="selUploadedVideos" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200 focus:ring-2 focus:ring-sky-500 outline-none">
+                                <option value="">-- Choisir une vidéo existante --</option>
+                            </select>
+                        </div>
+
+                        <div class="space-y-1">
+                            <label class="text-xs text-slate-400">Ou téléverser une nouvelle vidéo (.mp4, .mov, .avi) :</label>
+                            <input id="fileUploadInput" type="file" accept="video/*" class="w-full text-xs text-slate-400 file:mr-2 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-sky-600 file:text-white hover:file:bg-sky-500 cursor-pointer">
+                        </div>
+                    </div>
+
+                    <button id="btnApplySource" class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-sky-600 to-emerald-600 hover:from-sky-500 hover:to-emerald-500 text-white font-bold text-xs shadow-lg shadow-sky-600/20 transition">
+                        Lancer cette Source Vidéo
+                    </button>
+                </div>
+
+
+                <!-- Detection Parameters -->
+                <div class="space-y-4 bg-slate-950/50 p-4 rounded-xl border border-slate-800">
+                    <label class="text-xs font-bold text-sky-400 uppercase tracking-wider block">2. Paramètres IA & Détection</label>
+                    
+                    <!-- Confidence Slider -->
+                    <div class="space-y-1">
+                        <div class="flex justify-between text-xs">
+                            <span class="text-slate-400">Seuil de Confiance YOLO :</span>
+                            <span id="lblConf" class="font-bold text-sky-400">35%</span>
+                        </div>
+                        <input id="sliderConf" type="range" min="10" max="90" value="35" class="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-sky-500">
+                    </div>
+
+                    <!-- Classes Checkboxes -->
+                    <div class="space-y-2">
+                        <span class="text-xs text-slate-400 block">Classes de véhicules surveillées :</span>
+                        <div class="grid grid-cols-2 gap-2 text-xs">
+                            <label class="flex items-center space-x-2 bg-slate-800/80 p-2 rounded-lg cursor-pointer border border-slate-700">
+                                <input type="checkbox" id="chkCar" value="car" checked class="rounded text-sky-500 focus:ring-sky-500 bg-slate-900 border-slate-600">
+                                <span>Voitures</span>
+                            </label>
+                            <label class="flex items-center space-x-2 bg-slate-800/80 p-2 rounded-lg cursor-pointer border border-slate-700">
+                                <input type="checkbox" id="chkTruck" value="truck" checked class="rounded text-sky-500 focus:ring-sky-500 bg-slate-900 border-slate-600">
+                                <span>Camions</span>
+                            </label>
+                            <label class="flex items-center space-x-2 bg-slate-800/80 p-2 rounded-lg cursor-pointer border border-slate-700">
+                                <input type="checkbox" id="chkMotorcycle" value="motorcycle" checked class="rounded text-sky-500 focus:ring-sky-500 bg-slate-900 border-slate-600">
+                                <span>Motos</span>
+                            </label>
+                            <label class="flex items-center space-x-2 bg-slate-800/80 p-2 rounded-lg cursor-pointer border border-slate-700">
+                                <input type="checkbox" id="chkBus" value="bus" checked class="rounded text-sky-500 focus:ring-sky-500 bg-slate-900 border-slate-600">
+                                <span>Bus</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="space-y-2 pt-2 border-t border-slate-800">
+                        <label class="flex items-center justify-between cursor-pointer text-xs">
+                            <span class="text-slate-300">Performance automatique</span>
+                            <input type="checkbox" id="chkAutoPerformance" checked class="rounded text-purple-500 bg-slate-900 border-slate-600">
+                        </label>
+                        <p class="text-[10px] text-slate-500">Utilise automatiquement toute la puissance disponible sans lancer plusieurs analyses en parallèle.</p>
+                        <div id="grpTargetFps" class="space-y-1 hidden">
+                            <label class="text-xs text-slate-400" for="txtTargetFps">Limite manuelle FPS :</label>
+                            <input id="txtTargetFps" type="number" min="1" max="60" value="12" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 outline-none">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Speed calibration -->
+                <div class="space-y-4 bg-slate-950/50 p-4 rounded-xl border border-slate-800">
+                    <label class="text-xs font-bold text-cyan-400 uppercase tracking-wider block">3. Calibration de la vitesse</label>
+                    <p class="text-[11px] text-slate-400">Distance réelle entre la ligne jaune de comptage et la ligne bleue de vitesse.</p>
+                    <div class="space-y-1">
+                        <label class="text-xs text-slate-400" for="txtSpeedDistance">Distance réelle en mètres :</label>
+                        <input id="txtSpeedDistance" type="number" min="0.1" max="1000" step="0.1" value="10" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:ring-2 focus:ring-cyan-500 outline-none">
+                    </div>
+                    <div class="space-y-1">
+                        <div class="flex justify-between text-xs"><span class="text-slate-400">Position de la seconde ligne :</span><span id="lblSpeedLineY" class="font-bold text-cyan-400">55%</span></div>
+                        <input id="sliderSpeedLineY" type="range" min="2" max="98" value="55" class="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-500">
+                    </div>
+                    <label class="flex items-center justify-between cursor-pointer text-xs"><span class="text-slate-300">Afficher la ligne de vitesse</span><input type="checkbox" id="chkShowSpeedLine" checked class="rounded text-cyan-500 bg-slate-900 border-slate-600"></label>
+                </div>
+
+                <!-- Vehicle make / model identification -->
+                <div class="space-y-3 bg-slate-950/50 p-4 rounded-xl border border-slate-800">
+                    <label class="text-xs font-bold text-amber-400 uppercase tracking-wider block">5. Marque & modèle (IA Claude)</label>
+                    <label class="flex items-center justify-between cursor-pointer text-xs">
+                        <span class="text-slate-300">Identifier les véhicules comptés</span>
+                        <input type="checkbox" id="chkVehicleId" class="rounded text-amber-500 bg-slate-900 border-slate-600">
+                    </label>
+                    <div class="space-y-1">
+                        <label class="text-xs text-slate-400" for="txtVehicleIdKey">Clé API Anthropic :</label>
+                        <input id="txtVehicleIdKey" type="password" autocomplete="off" placeholder="sk-ant-..." class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200 focus:ring-2 focus:ring-amber-500 outline-none font-mono">
+                        <p id="lblVehicleIdKey" class="text-[10px] text-slate-500">Laisser vide pour garder la clé enregistrée (ou utiliser ANTHROPIC_API_KEY).</p>
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-xs text-slate-400" for="txtVehicleIdRate">Maximum d'identifications par minute :</label>
+                        <input id="txtVehicleIdRate" type="number" min="1" max="120" value="20" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 outline-none">
+                    </div>
+                    <p class="text-[10px] text-slate-500">Une image par véhicule compté est envoyée à l'API Claude (payant, environ 1 centime par véhicule).</p>
+                    <p id="lblVehicleIdStatus" class="text-[10px] text-slate-400"></p>
+                </div>
+
+                <!-- Display Overlays Options -->
+                <div class="space-y-3 bg-slate-950/50 p-4 rounded-xl border border-slate-800">
+                    <label class="text-xs font-bold text-sky-400 uppercase tracking-wider block">4. Affichage Visuel</label>
+                    <div class="space-y-2 text-xs">
+                        <label class="flex items-center justify-between cursor-pointer">
+                            <span class="text-slate-300">Boîtes de détection (Bounding Boxes)</span>
+                            <input type="checkbox" id="chkShowBoxes" checked class="rounded text-sky-500 bg-slate-900 border-slate-600">
+                        </label>
+                        <label class="flex items-center justify-between cursor-pointer">
+                            <span class="text-slate-300">Trajectoires (Trails de suivi)</span>
+                            <input type="checkbox" id="chkShowTrails" checked class="rounded text-sky-500 bg-slate-900 border-slate-600">
+                        </label>
+                        <label class="flex items-center justify-between cursor-pointer">
+                            <span class="text-slate-300">Étiquettes & Confiance (%)</span>
+                            <input type="checkbox" id="chkShowLabels" checked class="rounded text-sky-500 bg-slate-900 border-slate-600">
+                        </label>
+                        <label class="flex items-center justify-between cursor-pointer">
+                            <span class="text-slate-300">Ligne de franchissement</span>
+                            <input type="checkbox" id="chkShowLine" checked class="rounded text-sky-500 bg-slate-900 border-slate-600">
+                        </label>
+                    </div>
+                </div>
+                <!-- Save Settings Button -->
+                <button id="btnSaveSettings" class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-sky-500 to-emerald-500 hover:from-sky-400 hover:to-emerald-400 text-white font-bold text-sm shadow-lg shadow-sky-500/25 transition">
+                    Enregistrer les Paramètres
+                </button>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Bilan Final de la Vidéo -->
+    <div id="modalVideoComplete" class="fixed inset-0 z-50 overflow-hidden hidden items-center justify-center p-4">
+
+
+        <div id="modalVideoBackdrop" class="fixed inset-0 bg-black/80 backdrop-blur-md cursor-pointer"></div>
+
+        <div class="relative bg-slate-900 border border-slate-700 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-6 z-10 animate-in fade-in zoom-in-95 duration-200">
+            
+            <div class="text-center space-y-2">
+                <div class="w-16 h-16 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center mx-auto shadow-lg shadow-emerald-500/20">
+                    <i data-lucide="check-check" class="w-8 h-8"></i>
+                </div>
+                <h2 class="text-2xl font-black text-white">Analyse Vidéo Terminée !</h2>
+                <p class="text-xs text-slate-400">Le fichier vidéo a été analysé du début à la fin.</p>
+            </div>
+
+            <!-- Bilan Cards -->
+            <div class="grid grid-cols-3 gap-2">
+                <div class="bg-slate-950 p-3 rounded-2xl border border-slate-800 text-center">
+                    <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Total</span>
+                    <span id="modalTotalCount" class="text-2xl font-black text-sky-400">0</span>
+                </div>
+                <div class="bg-slate-950 p-3 rounded-2xl border border-slate-800 text-center">
+                    <span class="text-[9px] font-bold text-emerald-400 uppercase tracking-wider block">▲ Monte</span>
+                    <span id="modalUpCount" class="text-2xl font-black text-emerald-400">0</span>
+                </div>
+                <div class="bg-slate-950 p-3 rounded-2xl border border-slate-800 text-center">
+                    <span class="text-[9px] font-bold text-orange-400 uppercase tracking-wider block">▼ Descend</span>
+                    <span id="modalDownCount" class="text-2xl font-black text-orange-400">0</span>
+                </div>
+            </div>
+
+            <!-- Détail par catégorie -->
+            <div class="bg-slate-950/70 p-4 rounded-2xl border border-slate-800 space-y-2 text-xs">
+                <h4 class="font-bold text-slate-300">Détail par catégorie :</h4>
+                <p class="text-[10px] text-slate-500 mb-2">détectés · dont comptés (▲ monte | ▼ descend)</p>
+                <div class="flex justify-between text-slate-300">
+                    <span>🚗 Voitures :</span>
+                    <span id="modalCarCount" class="font-bold text-sky-400">0</span>
+                </div>
+                <div class="flex justify-between text-slate-300">
+                    <span>🚚 Camions :</span>
+                    <span id="modalTruckCount" class="font-bold text-orange-400">0</span>
+                </div>
+                <div class="flex justify-between text-slate-300">
+                    <span>🏍️ Motos :</span>
+                    <span id="modalMotorcycleCount" class="font-bold text-emerald-400">0</span>
+                </div>
+                <div class="flex justify-between text-slate-300">
+                    <span>🚌 Bus :</span>
+                    <span id="modalBusCount" class="font-bold text-purple-400">0</span>
+                </div>
+            </div>
+
+            <!-- Véhicules détectés mais non comptés -->
+            <div id="modalUncountedBox" class="hidden bg-slate-950/70 p-4 rounded-2xl border border-slate-800 space-y-1.5 text-xs">
+                <h4 class="font-bold text-slate-300">Pourquoi <span id="modalUncountedTotal">0</span> véhicule(s) n'ont pas été comptés :</h4>
+                <p class="text-[10px] text-slate-500 mb-1">Seul le franchissement de la ligne jaune compte un véhicule.</p>
+                <div id="modalUncountedList" class="space-y-1"></div>
+            </div>
+
+            <!-- Marques identifiées -->
+            <div id="modalMakesBox" class="hidden bg-slate-950/70 p-4 rounded-2xl border border-slate-800 space-y-1.5 text-xs">
+                <h4 class="font-bold text-slate-300">Marques identifiées :</h4>
+                <div id="modalMakesList" class="space-y-1"></div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex flex-col sm:flex-row gap-2 pt-1">
+                <button id="btnModalReplay" class="flex-1 py-2.5 px-3 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs shadow-lg shadow-sky-600/30 transition flex items-center justify-center space-x-1.5">
+                    <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+                    <span>Rejouer Vidéo</span>
+                </button>
+                <button id="btnModalExport" class="flex-1 py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs transition flex items-center justify-center space-x-1.5">
+                    <i data-lucide="file-down" class="w-3.5 h-3.5 text-emerald-400"></i>
+                    <span>Export CSV</span>
+                </button>
+                <button id="btnModalClose" class="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white text-xs transition">
+                    Fermer
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="/static/js/dashboard.js?v=1.4.0"></script>
+    <script>
+        lucide.createIcons();
+    </script>
+</body>
+</html>
